@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import os
 from GeneticAlgorithm import geneticAlgorithmOptimize
 from utils import Color
-import pprint
+from pprint import pprint
 
 # Set environment variable to avoid OMP error
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -89,10 +89,11 @@ def main():
 
     # Run genetic algorithm optimization
     bestParams = geneticAlgorithmOptimize(trainFunc=trainYolo, valFunc=validateYolo, baseParams=baseParams)
-    color_printer.print(f"Best Parameters: {bestParams}", color="magenta", bold=True, underline=True)
-    pprint("{bestParams}")
+    color_printer.print(f"Best Parameters: ", color="magenta", bold=True, underline=True)
+    pprint(f"{bestParams}")
 
     # Train final model with optimized parameters
+    color_printer.print(f"Retraining the best model config (done as we can't store each trained due to size complexity, need to retrain after we know what the best is'): ", color="red", bold=True, underline=True)
     model = trainYolo(bestParams)
     metrics = validateYolo(model)
 
