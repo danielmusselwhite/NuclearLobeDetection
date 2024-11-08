@@ -1,5 +1,8 @@
 from ultralytics import YOLO
 import os
+from GeneticAlgorithm import geneticAlgorithmOptimize
+from utils import Color
+import pprint
 
 # Set environment variable to avoid OMP error
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -11,12 +14,10 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 # Define a function to train the YOLO model
 def trainYolo(params):
-    model = YOLO('yolov8s.pt')
+    model = YOLO(params.get('model', 'yolov8s.pt'))
 
     # Train the model on the custom dataset
-    model.train(
-        **params
-    )
+    model.train(**params)
     return model
 #endregion
 
@@ -38,14 +39,7 @@ def validateYolo(model):
     print(f"mAP@0.5:0.95: {metrics['metrics/mAP50-95(B)']:.2f}")
     print(f"fitness: {metrics['fitness']:.2f}")
 
-    # Save the above to validationResults.txt
-    with open("validationResults.txt", "w") as f:
-        f.write("Validation Accuracy Metrics:\n")
-        f.write(f"Precision: {metrics['metrics/precision(B)']:.2f}\n")
-        f.write(f"Recall: {metrics['metrics/recall(B)']:.2f}\n")
-        f.write(f"mAP@0.5: {metrics['metrics/mAP50(B)']:.2f}\n")
-        f.write(f"mAP@0.5:0.95: {metrics['metrics/mAP50-95(B)']:.2f}\n")
-        f.write(f"fitness: {metrics['fitness']:.2f}\n")
+    return metrics
 
 #endregion
 
@@ -80,29 +74,38 @@ def runInference(model, fullFileName):
 
 # Main function
 def main():
-    # TODO - replace with a genetic algorithm or other HPOA, possibly also warm-start
-
-    # Define params as a dictionary
-    params = {
-        "data": 'config.yaml',  # Path to config.yaml
-        "epochs": 50,          # Number of epochs for training
-        "batch": 16,            # Batch size
-        "imgsz": 640,           # Image size
-        "project": 'nuclearLobes',  # Project directory to save results
-        "name": 'exp1',         # Experiment name
-        "pretrained": True      # Start with pre-trained weights
+    # Initial parameters
+    base_params = {
+        "model": 'yolov8s.pt',      # Yolo version
+        "data": 'config.yaml',      # Data configuration
+        "epochs": 50,               # Number of epochs
+        "batch": 16,                # Batch size (number of images per batch)
+        "imgsz": 640,               # Image size (number of pixels (all images will be resized to this size during training))
+        "project": 'nuclearLobes',  # Project name
+        "name": 'exp1',             # Experiment name
+        "pretrained": True          # Use pre-trained model
     }
 
-    # Train the model with the specified parameters
-    model = trainYolo(params=params)
+    # Run genetic algorithm optimization
+    best_params = geneticAlgorithmOptimize(train_func=trainYolo, val_func=validateYolo, base_params=base_params)
+    print(f"{Color.BOLD}{Color.UNDERLINE}{Color.MAGENTA}Best parameters found: ")
+    pprint("{best_params}")
 
-    # Validate the trained model
-    validateYolo(model)
-    # TODO - end of what should be wrapped in a GA
+    # Train final model with optimized parameters
+    model = trainYolo(best_params)
+    metrics = validateYolo(model)
 
-    # Run inference on a single image
+    # Save the above to validationResults.txt
+    with open("validationResults.txt", "w") as f:
+        f.write("Validation Accuracy Metrics:\n")
+        f.write(f"Precision: {metrics['metrics/precision(B)']:.2f}\n")
+        f.write(f"Recall: {metrics['metrics/recall(B)']:.2f}\n")
+        f.write(f"mAP@0.5: {metrics['metrics/mAP50(B)']:.2f}\n")
+        f.write(f"mAP@0.5:0.95: {metrics['metrics/mAP50-95(B)']:.2f}\n")
+        f.write(f"fitness: {metrics['fitness']:.2f}\n")
+
+    # Run inference on a test image
     runInference(model, "ToBeReplaced.png")
 
-# Ensure main() runs when script is executed directly
 if __name__ == "__main__":
     main()
