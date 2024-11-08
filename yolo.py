@@ -88,7 +88,7 @@ def main():
     }
 
     # Run genetic algorithm optimization
-    bestParams = geneticAlgorithmOptimize(trainFunc=trainYolo, valFunc=validateYolo, baseParams=baseParams, generations=4, populationSize=8)
+    bestParams = geneticAlgorithmOptimize(trainFunc=trainYolo, valFunc=validateYolo, baseParams=baseParams, generations=20, populationSize=40)
     color_printer.print(f"Best Parameters: ", color="magenta", bold=True, underline=True)
     pprint(f"{bestParams}")
 

@@ -7,16 +7,17 @@ from pprint import pprint
 # Initialize the Color object from Utils.py
 color_printer = Color()
 
-# Define hyperparameters to tune and their ranges
+# Define hyperparameters to tune and their ranges - https://docs.ultralytics.com/modes/train/#resuming-interrupted-trainings
 paramRanges = {
-    "epochs": (int, (10, 500)),  # Number of training epochs
+    # Train Settings
+    "epochs": (int, (100, 600)),  # Number of training epochs
     "batch": (int, (8, 32)),  # Batch size
     "lr0": (float, (1e-5, 1e-2)),  # Initial learning rate
     "momentum": (float, (0.8, 0.99)),  # Momentum factor
     "weight_decay": (float, (0.0001, 0.01)),  # Weight decay for L2 regularization
     "imgsz": (int, (80, 2560)),  # Target image size
     "lrf": (float, (0.1, 1.0)),  # Final learning rate fraction, affects learning rate decay
-    "patience": (int, (10, 400)),  # Early stopping patience to prevent overfitting
+    "patience": (int, (10, 100)),  # Early stopping patience to prevent overfitting
     "warmup_epochs": (float, (0.0, 10.0)),  # Epochs for learning rate warmup
     "warmup_momentum": (float, (0.0, 0.95)),  # Initial momentum during warmup
     "warmup_bias_lr": (float, (0.0, 0.2)),  # Bias learning rate during warmup phase
@@ -31,6 +32,26 @@ paramRanges = {
     "single_cls": (bool, (False, True)),  # Binary classification mode toggle
     "close_mosaic": (int, (0, 20)),  # Number of epochs to disable mosaic augmentation before end
     "freeze": (int, (0, 10)),  # Number of layers to freeze for transfer learning
+
+    # Augmentation Settings and Hyperparameters
+    "hsv_h": (float, (0.0, 1.0)), # adjusts hue
+    "hsv_s": (float, (0.0, 1.0)), # adjusts saturation
+    "hsv_v": (float, (0.0, 1.0)), # adjusts value
+    "degrees": (float, (-180.0, 180.0)), # Rotation angle
+    "translate": (float, (0.0, 1.0)), # Translation factor
+    "scale": (float, (0.0, 100.0)),  # Scale
+    "shear": (float, (-180.0, 180.0)), # Shear angle
+    "perspective": (float, (0.0, 0.001)), # Perspective distortion
+    "flipud": (float, (0.0, 1.0)), # flip image upside down
+    "fliplr": (float, (0.0, 1.0)), # flip image left to right
+    "bgr": (float, (0.0, 1.0)), # flips image RGB to BGR
+    "mosaic": (float, (0.0, 1.0)), # combines 4 images into one
+    "mixup": (float, (0.0, 1.0)), # blends two images and their labels creating a composite image
+    "copy_paste": (float, (0.0, 1.0)), # copy and paste a section of an image onto another image
+    "copy_paste_mode": (str, ('flip', 'mixup')), # copy and paste mode
+    "auto_augment": (str, ('randaugment', 'autoaugment', 'augmix')), # automatic applies a predefined augmentation policy
+    "erasing": (float, (0.0, 0.9)), # random erasies a portion of the image
+    "crop_fraction": (float, (0.1, 1.0)), # crops image to a fraction of its size
 }
 
 # Generate a random set of hyperparameters within defined ranges
@@ -53,15 +74,16 @@ def generateRandomParams(baseParams):
     return params
 
 # Genetic algorithm optimization function
-def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric='metrics/mAP50-95(B)', generations=10, populationSize=24):
-    # TODO - add early termination if: 1. no improvement in n x generations, or 2. we found a good enough model (0.95 mAP?)
-
+def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric='metrics/mAP50-95(B)', generations=10, populationSize=24, noImprovementThreshold=3, goodEnoughThreshold=0.95):
     # Generate initial population by randomly sampling hyperparameters
     population = [generateRandomParams(baseParams) for _ in range(populationSize)]
     allGenerations = []  # List to track all generations' (params, scores)
     bestModel = None  # To track the best model and its details (score, generation, index)
     bestScore = -float('inf')  # Initialize with very low score
     generationScores = []  # To track average fitness for each generation
+    
+    # Early termination counters
+    generationsWithoutImprovement = 0
 
     for generation in range(generations):
         color_printer.print(f"Generation {generation + 1}/{generations}", color="red", bold=True, underline=True)
@@ -69,7 +91,10 @@ def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric=
         # Store current generation's (params, score) pairs
         thisGeneration = []
 
-        # Evaluate population fitness (validation score) for each individual in the population
+        #region "Evaluate population fitness (validation score) for each individual in the population"
+        populationBestFitness = -float('inf')
+        populationBestModel = None
+        individualNumber = -1
         for i, params in enumerate(population):
             color_printer.print(f"Training individual {i+1}/{populationSize} from Generation {generation + 1}/{generations}", color="red")
             model = trainFunc(params)
@@ -79,9 +104,20 @@ def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric=
             color_printer.print(f"Fitness Score ({optimizationMetric}): {fitness}", color="green")
 
             # Track the best model
-            if fitness > bestScore:
-                bestScore = fitness
-                bestModel = (fitness, params, generation, i)  # Store (score, params, generation, index)
+            if fitness > populationBestFitness:
+                populationBestFitness = fitness
+                populationBestModel = model
+                individualNumber = i
+        
+        # If this populations best model is better than the best model so far, update the best model
+        if populationBestFitness > bestScore:
+            bestScore = populationBestFitness
+            bestModel = (bestScore, populationBestModel, generation, individualNumber)
+            generationsWithoutImprovement = 0 # Reset counter for no improvement as we have found a better model
+        # Else we haven't improved so increment the counter
+        else:
+            generationsWithoutImprovement += 1
+        #endregion
 
         # Update allGenerations with this generation's results
         allGenerations.append(thisGeneration)
@@ -90,6 +126,19 @@ def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric=
         avgFitness = sum(fitness[0] for fitness in thisGeneration) / len(thisGeneration)
         generationScores.append(avgFitness)
 
+        
+        #region "Early termination"
+        # Check if the model is good enough or if we have no improvement for 'n' generations
+        if bestScore >= goodEnoughThreshold:
+            color_printer.print(f"Early stopping: Found a good enough model with a fitness score of {bestScore} (>= {goodEnoughThreshold})", color="blue", bold=True)
+            break
+        if generationsWithoutImprovement >= noImprovementThreshold:
+            color_printer.print(f"Early stopping: No improvement in the last {noImprovementThreshold} generations", color="blue", bold=True)
+            break
+        #endregion
+
+
+        #region "Generating new population using crossover and mutation"
         # Select top performers (e.g., top 50%) to serve as parents for the next generation
         thisGeneration.sort(reverse=True, key=lambda x: x[0]) # Sort by fitness score in descending order
         topPerformers = thisGeneration[:populationSize // 2] # Select top 50% of performers
@@ -104,6 +153,7 @@ def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric=
 
         # Replace old population with new population
         population = newPopulation
+        #endregion
 
     # Return the best parameters from all generations
     color_printer.print(f"The best model was individual {bestModel[3] + 1} from generation {bestModel[2] + 1} with a fitness score of {bestModel[0]}", color="magenta")
@@ -187,8 +237,9 @@ def plotGraphs(generationScores, allGenerations):
     plt.ylabel('Average Fitness')
     plt.grid(True)
     plt.legend()
-    plt.show()
     plt.savefig('AverageFitnessPerGeneration.png')
+    plt.show()
+    plt.close()
 
     # Plot boxplot for fitness distribution per generation
     fitnessPerGeneration = [[fitness[0] for fitness in gen] for gen in allGenerations]
@@ -198,6 +249,7 @@ def plotGraphs(generationScores, allGenerations):
     plt.xlabel('Generation')
     plt.ylabel('Fitness')
     plt.grid(True)
-    plt.show()
     plt.savefig('FitnessDistributionPerGeneration.png')
+    plt.show()
+    plt.close()
 
