@@ -8,29 +8,52 @@ from pprint import pprint
 color_printer = Color()
 
 # Define hyperparameters to tune and their ranges
-# TODO - find more hyperparemeters to tune and optimal ranges
 paramRanges = {
-    "epochs": (int, (10, 100)),
-    "batch": (int, (8, 32)),
-    "lr0": (float, (1e-5, 1e-2)),
-    "momentum": (float, (0.8, 0.99)),
-    "weight_decay": (float, (0.0001, 0.01)),
-    "imgsz": (int, (320, 1280))
+    "epochs": (int, (10, 500)),  # Number of training epochs
+    "batch": (int, (8, 32)),  # Batch size
+    "lr0": (float, (1e-5, 1e-2)),  # Initial learning rate
+    "momentum": (float, (0.8, 0.99)),  # Momentum factor
+    "weight_decay": (float, (0.0001, 0.01)),  # Weight decay for L2 regularization
+    "imgsz": (int, (80, 2560)),  # Target image size
+    "lrf": (float, (0.1, 1.0)),  # Final learning rate fraction, affects learning rate decay
+    "patience": (int, (10, 400)),  # Early stopping patience to prevent overfitting
+    "warmup_epochs": (float, (0.0, 10.0)),  # Epochs for learning rate warmup
+    "warmup_momentum": (float, (0.0, 0.95)),  # Initial momentum during warmup
+    "warmup_bias_lr": (float, (0.0, 0.2)),  # Bias learning rate during warmup phase
+    "cos_lr": (bool, (False, True)),  # Toggle for cosine learning rate scheduler
+    "optimizer": (str, ('SGD', 'Adam', 'AdamW', 'RMSProp')),  # Choice of optimizer
+    "box": (float, (0.05, 10.0)),  # Box loss weight
+    "cls": (float, (0.05, 5.0)),  # Classification loss weight
+    "dfl": (float, (0.0, 5.0)),  # Distribution focal loss weight
+    "label_smoothing": (float, (0.0, 0.2)),  # Label smoothing factor for class labels
+    "dropout": (float, (0.0, 0.5)),  # Dropout rate for regularization
+    "rect": (bool, (False, True)),  # Enables rectangular training for more efficient padding
+    "single_cls": (bool, (False, True)),  # Binary classification mode toggle
+    "close_mosaic": (int, (0, 20)),  # Number of epochs to disable mosaic augmentation before end
+    "freeze": (int, (0, 10)),  # Number of layers to freeze for transfer learning
 }
 
 # Generate a random set of hyperparameters within defined ranges
 def generateRandomParams(baseParams):
     params = baseParams.copy()
     # Generate random values for each parameter within the specified range
-    for param, (paramType, (low, high)) in paramRanges.items():
-        if paramType == int:
-            params[param] = random.randint(low, high)  # Random integer between low and high
-        elif paramType == float:
-            params[param] = random.uniform(low, high)  # Random float between low and high
+    for key, value in paramRanges.items():
+        # if this is a string pick a random value from the list of possible values
+        if value[0] == str:
+            params[key] = random.choice(value[1])
+        # if this is a boolean pick a random value from 0 or 1
+        elif value[0] == bool:
+            params[key] = random.choice([True, False])
+        # if this is a int pick a random value from the range
+        elif value[0] == int:
+            params[key] = random.randint(value[1][0], value[1][1])
+        # if this is a float pick a random value from the range
+        elif value[0] == float:
+            params[key] = random.uniform(value[1][0], value[1][1])
     return params
 
 # Genetic algorithm optimization function
-def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric='metrics/mAP50-95(B)', generations=3, populationSize=4):
+def geneticAlgorithmOptimize(trainFunc, valFunc, baseParams, optimizationMetric='metrics/mAP50-95(B)', generations=10, populationSize=24):
     # TODO - add early termination if: 1. no improvement in n x generations, or 2. we found a good enough model (0.95 mAP?)
 
     # Generate initial population by randomly sampling hyperparameters
@@ -111,27 +134,46 @@ def crossover(params1, params2):
 def mutate(params, mutationRate=0.2, mutationSize=0.3):
     mutatedParams = {}
     for key, value in params.items():
-        # if this parameter is not in the range dictionary, skip it as it is not tunable
+        # If this parameter is not in the range dictionary, skip it as it is not tunable
         if key not in paramRanges:
             mutatedParams[key] = value
             continue
 
-        # else it is tunable randomly decide whether to mutate this parameter
+        # Get the expected type for this parameter from paramRanges
+        paramType = paramRanges[key][0]
+        
+        # Randomly decide whether to mutate this parameter
         if random.random() < mutationRate:
-            low, high = paramRanges[key][1]
-            mutationRange = (high - low) * mutationSize
-            mutation = random.uniform(-mutationRange, mutationRange) # Random increase vs decrease percent
-            mutatedValue = value + mutation
-            mutatedValue = max(low, min(high, mutatedValue))  # Ensure value is within range
-            
-            # Ensure the mutated value is of the correct type
-            if isinstance(value, int):
-                mutatedValue = int(round(mutatedValue))  # Round to nearest integer if it was an integer
-            
-            color_printer.print(f"Mutating parameter {key} from {value} to {mutatedValue} ({mutation / (high - low) * 100}% (range {low} to {high}))", color="yellow")
-            mutatedParams[key] = mutatedValue
+            # If this parameter is a float or int, apply Gaussian noise
+            if paramType in [int, float]:
+                low, high = paramRanges[key][1]
+                mutationRange = (high - low) * mutationSize
+                mutation = random.uniform(-mutationRange, mutationRange) # Random increase vs decrease percent
+                mutatedValue = value + mutation
+                mutatedValue = max(low, min(high, mutatedValue))  # Ensure value is within range
+                
+                # Ensure the mutated value is of the correct type
+                if paramType == int:
+                    mutatedValue = int(round(mutatedValue))  # Round to nearest integer if it was an integer
+                
+                color_printer.print(f"Mutating parameter {key} from {value} to {mutatedValue} ({mutation / (high - low) * 100}% (range {low} to {high}))", color="yellow")
+                mutatedParams[key] = mutatedValue
+
+            # If this parameter is boolean, flip it
+            elif paramType == bool:
+                color_printer.print(f"Mutating boolean parameter {key} from {value} to {not value}", color="yellow")
+                mutatedParams[key] = not value
+
+            # If this parameter is a string, randomly select a new value
+            elif paramType == str:
+                possibleValues = list(paramRanges[key][1])
+                possibleValues.remove(value)  # Remove current value to choose a different one
+                mutatedValue = random.choice(possibleValues)
+                color_printer.print(f"Mutating parameter {key} from {value} to {mutatedValue}", color="yellow")
+                mutatedParams[key] = mutatedValue
+
         else:
-            mutatedParams[key] = value
+            mutatedParams[key] = value # No mutation, keep the original value
     
     return mutatedParams
 

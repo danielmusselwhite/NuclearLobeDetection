@@ -75,7 +75,7 @@ def runInference(model, fullFileName):
 
 # Main function
 def main():
-    # Initial parameters
+    # Initial parameters that will supply default parameters to the genetic algorithm (some may be overwritten eg epochs, others lilke dataset will be used as is for all)
     baseParams = {
         "model": 'yolov8s.pt',      # Yolo version
         "data": 'config.yaml',      # Data configuration
@@ -88,7 +88,7 @@ def main():
     }
 
     # Run genetic algorithm optimization
-    bestParams = geneticAlgorithmOptimize(trainFunc=trainYolo, valFunc=validateYolo, baseParams=baseParams)
+    bestParams = geneticAlgorithmOptimize(trainFunc=trainYolo, valFunc=validateYolo, baseParams=baseParams, generations=4, populationSize=8)
     color_printer.print(f"Best Parameters: ", color="magenta", bold=True, underline=True)
     pprint(f"{bestParams}")
 

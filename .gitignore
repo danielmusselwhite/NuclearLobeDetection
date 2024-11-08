@@ -5,3 +5,5 @@ datasets/labels/train.cache
 yolov8s.pt
 .ipynb_checkpoints/
 __pycache__/
+datasets/coco/*
+datasets/coco2017labels-segments.zip
