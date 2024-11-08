@@ -7,7 +7,8 @@ import pprint
 # Set environment variable to avoid OMP error
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
-
+# Initialize the Color object from Utils.py
+color_printer = Color()
 
 #region "Training"
 # Load a pre-trained YOLOv8 model
@@ -61,21 +62,21 @@ def runInference(model, fullFileName):
     print("Detection Results:")
     for result in results:
         for detection in result.boxes:
-            class_id = int(detection.cls[0])       # Class index (ID) of detected object
-            class_name = model.names[class_id]     # Class name using model's class list
-            confidence = detection.conf[0]         # Confidence score of detection
-            bbox = detection.xyxy[0]               # Bounding box coordinates in [x1, y1, x2, y2] format
-            print(f"Class: {class_name}, Confidence: {confidence:.2f}, BBox: {bbox.tolist()}")
+            classId = int(detection.cls[0])     # Class index (ID) of detected object
+            className = model.names[classId]    # Class name using model's class list
+            confidence = detection.conf[0]      # Confidence score of detection
+            bbox = detection.xyxy[0]            # Bounding box coordinates in [x1, y1, x2, y2] format
+            print(f"Class: {className}, Confidence: {confidence:.2f}, BBox: {bbox.tolist()}")
 
     # Save the annotated image with bounding boxes
-    annotated_image_path = f"inferenceImages/{fileName}_annotated.{fileType}"
-    results.save(annotated_image_path)
+    annotatedImagePath = f"inferenceImages/{fileName}_annotated.{fileType}"
+    results.save(annotatedImagePath)
 #endregion
 
 # Main function
 def main():
     # Initial parameters
-    base_params = {
+    baseParams = {
         "model": 'yolov8s.pt',      # Yolo version
         "data": 'config.yaml',      # Data configuration
         "epochs": 50,               # Number of epochs
@@ -83,16 +84,16 @@ def main():
         "imgsz": 640,               # Image size (number of pixels (all images will be resized to this size during training))
         "project": 'nuclearLobes',  # Project name
         "name": 'exp1',             # Experiment name
-        "pretrained": True          # Use pre-trained model
+        "pretrained": True,         # Use pre-trained model
     }
 
     # Run genetic algorithm optimization
-    best_params = geneticAlgorithmOptimize(train_func=trainYolo, val_func=validateYolo, base_params=base_params)
-    print(f"{Color.BOLD}{Color.UNDERLINE}{Color.MAGENTA}Best parameters found: ")
-    pprint("{best_params}")
+    bestParams = geneticAlgorithmOptimize(trainFunc=trainYolo, valFunc=validateYolo, baseParams=baseParams)
+    color_printer.print(f"Best Parameters: {bestParams}", color="magenta", bold=True, underline=True)
+    pprint("{bestParams}")
 
     # Train final model with optimized parameters
-    model = trainYolo(best_params)
+    model = trainYolo(bestParams)
     metrics = validateYolo(model)
 
     # Save the above to validationResults.txt

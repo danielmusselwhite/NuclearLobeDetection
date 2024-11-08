@@ -1,14 +1,26 @@
-# Utils.py
+from rich.console import Console
+from rich.text import Text
 
 class Color:
-    PURPLE = '\033[95m'
-    CYAN = '\033[96m'
-    DARK_CYAN = '\033[36m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    MAGENTA = '\033[35m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
+    # Initialize the Console instance
+    def __init__(self):
+        self.console = Console()
+
+    def print(self, text, color=None, bold=False, underline=False):
+        """Method to print styled text using rich"""
+        styled_text = Text(text)
+        
+        # Apply color if specified
+        if color:
+            styled_text.stylize(color)
+        
+        # Apply bold if specified
+        if bold:
+            styled_text.stylize("bold")
+        
+        # Apply underline if specified
+        if underline:
+            styled_text.stylize("underline")
+
+        # Print the final styled text
+        self.console.print(styled_text)
