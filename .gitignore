@@ -1,7 +1,8 @@
-nuclearLobes/*
+gnuclearLobes/*
 validationResults.txt
 datasets/labels/val.cache
 datasets/labels/train.cache
 yolov8s.pt
-.ipynb_checkpoints/
-__pycache__/
+.ipynb_checkpoints/*
+__pycache__/*
+Images/*
