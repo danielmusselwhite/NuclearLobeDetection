@@ -1,7 +1,7 @@
 # How to Set Up the Conda Environment for YOLO Project
 
 ## 🔽 Step 1: Clone the Repo
-- Lauinch conda terminal or your preferred terminal application with conda installed.
+- Lauinch conda terminal or your preferred terminal application with conda3 installed.
 - git clone https://github.com/danielmusselwhite/NuclearLobeDetection
 - cd into the cloned directory:
   - cd NuclearLobeDetection
@@ -9,7 +9,7 @@
 ## 📦 Step 2: Create the Environment
 
 - Use the provided environment.yml file to create the Conda environment:
-  - **conda env create -f environment.yml**
+  - **conda env create -f yolo_env.yml**
 - This will create an environment (usually with the same name yolo_env).
 
 ## ✅ Step 3: Activate the Environment
