@@ -34,4 +34,4 @@ Largely based on my UG Diss: https://github.com/danielmusselwhite/UG_Dissertatio
 
 ## Docs
 
-![DeveloperGuide](docs/DeveloperGuide.md)
+[DeveloperGuide](docs/DeveloperGuide.md)
