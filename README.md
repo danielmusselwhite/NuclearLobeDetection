@@ -30,3 +30,8 @@ For each image in images/train or images/val, YOLO expects a corresponding .txt 
 ### Genetic Algorithm
 
 Largely based on my UG Diss: https://github.com/danielmusselwhite/UG_Dissertation_Energy_Forecasting/blob/main/Src/Jupyter_Notebooks/4.%20LGBM%20forecasting%20Genetic%20Algorithm.ipynb
+
+
+## Docs
+
+![DeveloperGuide](docs/DeveloperGuide.md)
